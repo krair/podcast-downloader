@@ -132,13 +132,13 @@ class Episode:
 
 def load_config():
     # Read and open config.yaml file stored in the same directory as this file
-    with open(f'./config.yaml', 'r') as f:
+    with open(f'./config/config.yaml', 'r') as f:
         return yaml.safe_load(f)
 
 def read_db():
     # Read and open the JSON "database" file stored within this directory
-    if os.path.isfile('./downloaded_episodes.json'):
-        with open('./downloaded_episodes.json', 'r') as f:
+    if os.path.isfile('./db/downloaded_episodes.json'):
+        with open('./db/downloaded_episodes.json', 'r') as f:
             return json.load(f)
     # If the file does not exist, start with an empty file
     else:
@@ -147,7 +147,7 @@ def read_db():
 def write_db(data):
     # Write updated information to the db file
     print('Writing to db file')
-    with open('./downloaded_episodes.json', 'w') as f:
+    with open('./db/downloaded_episodes.json', 'w') as f:
         json.dump(data, f)
 
 def write_tags(episode):
