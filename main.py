@@ -16,7 +16,7 @@ import eyed3
 import eyed3.id3
 from urllib.request import urlretrieve
 from dateutil import parser
-import podcastparser
+#import podcastparser
 import yaml
 
 ##### TODO ########

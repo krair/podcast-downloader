@@ -1,5 +1,4 @@
 eyed3
 feedparser
 python-dateutil
-podcastparser
 pyyaml
