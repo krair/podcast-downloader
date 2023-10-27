@@ -248,7 +248,7 @@ for _,settings in config['podcasts'].items():
                     else: episode.track_num = previous_episode_num + previous_episode_index - new_episode_counter
                     print(f"Downloading {episode.track_num}: {episode.title}")
                 # Download  episode audio file
-                episode.filename = episode.title.replace(' ', '_') + '.mp3'
+                episode.filename = episode.title.replace(' ', '_').replace('/','-') + '.mp3'
                 # Configurable?
                 remaining_download_tries = 5
                 while remaining_download_tries > 0 :
@@ -262,7 +262,7 @@ for _,settings in config['podcasts'].items():
                     else:
                         break
                 # Download episode artwork/image
-                episode.imagename = episode.title.replace(' ','_') + '.jpg'
+                episode.imagename = episode.title.replace(' ','_').replace('/','-') + '.jpg'
                 remaining_download_tries = 5
                 while remaining_download_tries > 0 :
                     try:
