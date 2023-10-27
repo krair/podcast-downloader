@@ -20,29 +20,33 @@ import podcastparser
 import yaml
 
 ##### TODO ########
-# Move print statements to proper logging
-# Notifications of new episodes (or not because already in DB)
-# Download podcast images
-# For TED RADIO HOUR: "new" podcasts can contain "Listen Again:" which are repeats of older episodes. I should use regex to capture the actual podcast name.
-#                    - Can also just contain a year "(2020)" for original broadcast year
-#                    - Use the "Original broadcast date:" in the summary? - I should store this as a variable alongside release date
-# Also capture the URL to the podcast episode (if exists)
-# Sort into correct folders; create new if podcast doesn't exist in database
-# Switch to aiohttp and async
-# Check how many episodes we should keep, and how many are currently on the system
-## Download and put into the db the most recent one, and purge the oldest (after) if we have more than podcast.keep specifies
+"""
+- Move print statements to proper logging
+- Add better error detection especially during the download of episodes
+    - if file exists, or if the download process cuts and we have an incomplete file
+    - If X number of errors with the given podcast, move to the next
+    - move the db write operation out to the end of a podcast's run to reduce disk writes
+- Notifications of new episodes (or not because already in DB)
+- Download podcast images
+- For TED RADIO HOUR: "new" podcasts can contain "Listen Again:" which are repeats of older episodes. I should use regex to capture the actual podcast name.
+-                    - Can also just contain a year "(2020)" for original broadcast year
+-                    - Use the "Original broadcast date:" in the summary? - I should store this as a variable alongside release date
+- Also capture the URL to the podcast episode (if exists)
+- Sort into correct folders; create new if podcast doesn't exist in database
+- Switch to aiohttp and async
+- Check how many episodes we should keep, and how many are currently on the system
+- Download and put into the db the most recent one, and purge the oldest (after) if we have more than podcast.keep specifies
+- Backfill: if 10 most recent are downloaded and in db, and we want the 10 prior? Or if we change 'keep' or get interupted...
+    - Episode (track_num) numbering might get messed up in this scenario
 
-# Backfill: if 10 most recent are downloaded and in db, and we want the 10 prior? Or if we change 'keep' or get interupted...
-    # Episode (track_num) numbering might get messed up in this scenario
+- Create a easy way to "save" episodes from being deleted if "keep" exists - can we read "favorited" from jellyfin api?
+    - Remove "listened to" but not favorited?
 
-# Create a easy way to "save" episodes from being deleted if "keep" exists - can we read "favorited" from jellyfin api?
-## Remove "listened to" 
+- check for episode number, or use arbitrary counter from the db
 
-# check for episode number, or use arbitrary counter from the db
+- Move to SQLite to avoid a crazy massive json file -- easier to manage I think as well
 
-# Move to SQLite to avoid a crazy massive json file -- easier to manage I think as well
-
-############################################################
+"""
 
 # To prevent issues with the eyed3 tagger - a lower log level would cause a Traceback
 eyed3.log.setLevel("ERROR")
@@ -127,20 +131,21 @@ class Episode:
         self._genre = ', '.join(list)
 
 def load_config():
-    #path = os.path.dirname(os.path.abspath(__file__))
-    #with open(f'{path}/config.yaml', 'r') as f:
+    # Read and open config.yaml file stored in the same directory as this file
     with open(f'./config.yaml', 'r') as f:
         return yaml.safe_load(f)
 
 def read_db():
-
+    # Read and open the JSON "database" file stored within this directory
     if os.path.isfile('./downloaded_episodes.json'):
         with open('./downloaded_episodes.json', 'r') as f:
             return json.load(f)
+    # If the file does not exist, start with an empty file
     else:
         return {'podcasts':[]}
 
 def write_db(data):
+    # Write updated information to the db file
     print('Writing to db file')
     with open('./downloaded_episodes.json', 'w') as f:
         json.dump(data, f)
@@ -210,6 +215,8 @@ for _,settings in config['podcasts'].items():
     if new_podcast == True:
         # If new, the list is reversed to allow correct episode numbering 
         feed_list = reversed(podcast.feed.entries[0:podcast.keep])
+        # Append the new podcast to the database
+        db['podcasts'].append(db_podcast)
     else: 
         feed_list = podcast.feed.entries[0:podcast.keep]
         #This section doesn't necessarily work correctly. Especially if a track is missing in the middle
@@ -276,12 +283,10 @@ for _,settings in config['podcasts'].items():
                 regtest = '^_?(.*)'
                 episode_data = {re.search(regtest,k).group(1):v for (k,v) in episode.__dict__.items()}
                 db_podcast['episodes'].insert(new_episode_counter - 1,episode_data)
+                # Write progress thus far to the db file
+                write_db(db)
                 # Sleep to prevent hitting request rate-limits
                 time.sleep(100)
         else:
             print("Reached 3 repeated episodes, breaking loop")
             break
-    # If the podcast does not already exist in our database, add it to the end.
-    if new_podcast == True:
-        db['podcasts'].append(db_podcast)
-    write_db(db)
