@@ -1,0 +1,9 @@
+path: ./downloads
+podcasts:
+  NPR - Ted Radio Hour:
+    feed: https://feeds.npr.org/510298/podcast.xml
+    author: NPR
+    keep: 10
+  NPR - Book of the Day:
+    feed: https://feeds.npr.org/510364/podcast.xml
+    keep: 5
