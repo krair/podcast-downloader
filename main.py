@@ -87,7 +87,10 @@ class Episode:
         self.release_date = (attributes.published, attributes.summary)
         self.genre = podcast.genre
         self.dl_url = attributes.links[1].href
-        self.image_url = attributes.image.href
+        try:
+            self.image_url = attributes.image.href
+        except:
+            self.image_url = None        
 
         # If the podcast has episode numbers built-in, set them here
         #self.track_num = 
@@ -165,9 +168,10 @@ def write_tags(episode):
         pass
     audiofile.tag.comments.set(episode.summary, description="")
     audiofile.tag.track_num = episode.track_num
-    with open(f"{podpath}/{episode.imagename}", "rb") as cover:
-        #audiofile.tag.images.set(FRONT_COVER, cover.read(), "image/jpeg", u"cover")
-        audiofile.tag.images.set(3, cover.read(), "image/jpeg", u"cover")
+    if episode.image_url:
+        with open(f"{podpath}/{episode.imagename}", "rb") as cover:
+            #audiofile.tag.images.set(FRONT_COVER, cover.read(), "image/jpeg", u"cover")
+            audiofile.tag.images.set(3, cover.read(), "image/jpeg", u"cover")
 
     audiofile.tag.save(version=eyed3.id3.ID3_V2_3)
     print(f"ID3 tags written to {episode.filename}")
@@ -262,19 +266,20 @@ for _,settings in config['podcasts'].items():
                     else:
                         break
                 # Download episode artwork/image
-                episode.imagename = episode.title.replace(' ','_').replace('/','-') + '.jpg'
-                remaining_download_tries = 5
-                while remaining_download_tries > 0 :
-                    try:
-                        urlretrieve(episode.image_url, f"{podpath}/{episode.imagename}")
-                        print("successfully downloaded image: " + episode.imagename)
-                    except:
-                        print("error downloading image " + episode.imagename +" on try no " + str(6 - remaining_download_tries))
-                        remaining_download_tries -= 1
-                        continue
-                    else:
-                        break
-                
+                if episode.image_url: 
+                    episode.imagename = episode.title.replace(' ','_').replace('/','-') + '.jpg'
+                    remaining_download_tries = 5
+                    while remaining_download_tries > 0 :
+                        try:
+                            urlretrieve(episode.image_url, f"{podpath}/{episode.imagename}")
+                            print("successfully downloaded image: " + episode.imagename)
+                        except:
+                            print("error downloading image " + episode.imagename +" on try no " + str(6 - remaining_download_tries))
+                            remaining_download_tries -= 1
+                            continue
+                        else:
+                            break
+                    
                 # Write ID3 tags to file
                 write_tags(episode)
             
