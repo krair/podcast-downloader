@@ -57,23 +57,23 @@ class Podcast:
     A Class to hold the information for the given podcast. Pulls in info from the config file, 
     otherwise uses info given from the podcast when the RSS feed is pulled.
     """
-  def __init__(self, settings):
-    # The number of episodes we want to keep - for example news older than a week may not interest us
-    self.keep = 0
-    # Pull any settings from the config file for organization and tagging
-    for k,v in settings.items():
-      setattr(self, k, v)
-    self.feed_url = self.feed
-    self.feed = feedparser.parse(self.feed_url)
-    self.name = self.feed.feed.title
-    try:
-      self.author = self.author
-    except:
-      self.author = self.feed.feed.author_detail.name
-    try:
-      self.genre = self.genre
-    except:
-      self.genre = [i.term for i in self.feed.feed.tags]
+    def __init__(self, settings):
+        # The number of episodes we want to keep - for example news older than a week may not interest us
+        self.keep = 0
+        # Pull any settings from the config file for organization and tagging
+        for k,v in settings.items():
+          setattr(self, k, v)
+        self.feed_url = self.feed
+        self.feed = feedparser.parse(self.feed_url)
+        self.name = self.feed.feed.title
+        try:
+          self.author = self.author
+        except:
+          self.author = self.feed.feed.author_detail.name
+        try:
+          self.genre = self.genre
+        except:
+          self.genre = [i.term for i in self.feed.feed.tags]
 
 class Episode:
     """
