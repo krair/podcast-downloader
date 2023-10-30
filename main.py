@@ -16,8 +16,9 @@ import eyed3
 import eyed3.id3
 from urllib.request import urlretrieve
 from dateutil import parser
-#import podcastparser
+import logging
 import yaml
+from pathvalidate import sanitize_filename
 
 ##### TODO ########
 """
@@ -47,6 +48,8 @@ import yaml
 - Move to SQLite to avoid a crazy massive json file -- easier to manage I think as well
 
 """
+
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', datefmt='%d-%b-%y %H:%M:%S', level=logging.WARNING)
 
 # To prevent issues with the eyed3 tagger - a lower log level would cause a Traceback
 eyed3.log.setLevel("ERROR")
@@ -145,6 +148,7 @@ def read_db():
             return json.load(f)
     # If the file does not exist, start with an empty file
     else:
+        logging.info('No database found! Creating an empty one.')
         return {'podcasts':[]}
 
 def write_db(data):
@@ -152,6 +156,20 @@ def write_db(data):
     print('Writing to db file')
     with open('./db/downloaded_episodes.json', 'w') as f:
         json.dump(data, f)
+
+def clean_filename(title):
+    return sanitize_filename(title).replace(' ', '_')
+
+def download_file(url, filename):
+    remaining_download_tries = 5
+    while remaining_download_tries > 0 :
+        try:
+            urlretrieve(url, f"{podpath}/{filename}")
+            logging.info(f"successfully downloaded: {filename}")
+        except:
+            logging.error(f"error downloading {filename} on try #{str(6 - remaining_download_tries)}")
+            remaining_download_tries -= 1
+            continue
 
 def write_tags(episode):
     #FRONT_COVER = eyed3.id3.frames.ImageFrame.FRONT_COVER
@@ -178,26 +196,30 @@ def write_tags(episode):
 
 # Load config
 config = load_config()
+logging.debug(f"Configuration loaded: /n{config}")
 # Load config path
 path = config['path']
 # Try to create path from config file, pass if exists
 try:
     os.makedirs(path)
+    logging.info(f"Path does not exist, creating at {path}")
 except:
+    logging.info(f"Path exists: {path}")
     pass
 # Load db
 db = read_db()
-
+logging.debug('Loaded db with podcasts: %s', ", ".join([i["name"] for i in db["podcasts"]]))
 # Start by selecting each podcast
 for _,settings in config['podcasts'].items():
     # Instantiate single podcast from list
     podcast = Podcast(settings)
-    print(f"=========Starting {podcast.name}=============")
+    logging.info(f"=========Starting {podcast.name}=============")
     # Set path for specific Podcast DL's in our path directory
     podpath = f"{path}/{podcast.author} - {podcast.name}"
     
     # Select Podcast if it exists in the db, otherwise create a new entry
     db_podcast = next(filter(lambda x: x['name'] == podcast.name, db['podcasts']), None)
+    logging.info(f"Using podcast in db: {db_podcast['name']}")
     new_podcast = False
     if not db_podcast:
         db_podcast = {'name': podcast.name, 
@@ -209,7 +231,9 @@ for _,settings in config['podcasts'].items():
                     'image_url': podcast.feed.feed.image.href,
                     'episodes': []
                    }
+        logging.info(f"Podcast not found, creating new entry: {db_podcast}")
         try:
+            logging.debug(f"Creating new directory: {podpath}")
             os.makedirs(podpath)
         except:
             pass
@@ -219,10 +243,12 @@ for _,settings in config['podcasts'].items():
     if new_podcast == True:
         # If new, the list is reversed to allow correct episode numbering 
         feed_list = reversed(podcast.feed.entries[0:podcast.keep])
+        logging.info(f"New Podcast. Downloading {len(feed_list)} episodes.")
         # Append the new podcast to the database
         db['podcasts'].append(db_podcast)
     else: 
         feed_list = podcast.feed.entries[0:podcast.keep]
+        logging.info(f"Downloading {len(feed_list} episodes.")
         #This section doesn't necessarily work correctly. Especially if a track is missing in the middle
         previous_episode_num = db_podcast['episodes'][0]['track_num']
         previous_episode_index = next(filter(lambda x: x[1]['title'] == db_podcast['episodes'][0]['title'], enumerate(podcast.feed.entries)), None)[0]
@@ -234,52 +260,32 @@ for _,settings in config['podcasts'].items():
     # Go through each episode in our list
     for i in feed_list:
         # Perhaps make this configurable
+        logging.info(f"Episode: {episode.title}")
         if repeats < 3:
             episode = Episode(i)
             # Check if episode exists in db, if not, continue to download
             if next(filter(lambda x: x['title'] == episode.title, db_podcast['episodes']), None):
-                print(f'Episode: "{episode.title}" already downloaded')
+                logging.info(f'Episode: "{episode.title}" already downloaded')
                 repeats += 1
             else:
                 repeats = 0
                 new_episode_counter += 1
                 # set episode number (this section also needs review)
                 try:
-                    print(f"Downloading {episode.track_num}: {episode.title}")
+                    logging.info(f"Downloading {episode.track_num}: {episode.title}")
                 except:
                     if new_podcast == True: 
                         episode.track_num = new_episode_counter
                     else: episode.track_num = previous_episode_num + previous_episode_index - new_episode_counter
-                    print(f"Downloading {episode.track_num}: {episode.title}")
+                    logging.info(f"Downloading {episode.track_num}: {episode.title}")
                 # Download  episode audio file
-                episode.filename = episode.title.replace(' ', '_').replace('/','-') + '.mp3'
-                # Configurable?
-                remaining_download_tries = 5
-                while remaining_download_tries > 0 :
-                    try:
-                        urlretrieve(episode.dl_url, f"{podpath}/{episode.filename}")
-                        print("successfully downloaded: " + episode.filename)
-                    except:
-                        print("error downloading " + episode.filename +" on try no " + str(6 - remaining_download_tries))
-                        remaining_download_tries -= 1
-                        continue
-                    else:
-                        break
-                # Download episode artwork/image
+                episode.filename = clean_filename(episode.title) + '.mp3'
+                download_file(episode.dl_url, episode.filename)
                 if episode.image_url: 
-                    episode.imagename = episode.title.replace(' ','_').replace('/','-') + '.jpg'
-                    remaining_download_tries = 5
-                    while remaining_download_tries > 0 :
-                        try:
-                            urlretrieve(episode.image_url, f"{podpath}/{episode.imagename}")
-                            print("successfully downloaded image: " + episode.imagename)
-                        except:
-                            print("error downloading image " + episode.imagename +" on try no " + str(6 - remaining_download_tries))
-                            remaining_download_tries -= 1
-                            continue
-                        else:
-                            break
-                    
+                    episode.imagename = episode.filename[:-3] + "jpg"
+                    download_file(episode.image_url, episode.imagename)
+                else:
+                    logging.info('No episode image found.')
                 # Write ID3 tags to file
                 write_tags(episode)
             

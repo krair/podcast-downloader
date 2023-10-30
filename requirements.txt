@@ -2,3 +2,4 @@ eyed3
 feedparser
 python-dateutil
 pyyaml
+pathvalidate
