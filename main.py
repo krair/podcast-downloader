@@ -248,7 +248,7 @@ for _,settings in config['podcasts'].items():
         db['podcasts'].append(db_podcast)
     else: 
         feed_list = podcast.feed.entries[0:podcast.keep]
-        logging.info(f"Downloading {len(feed_list} episodes.")
+        logging.info(f"Downloading {len(feed_list)} episodes.")
         #This section doesn't necessarily work correctly. Especially if a track is missing in the middle
         previous_episode_num = db_podcast['episodes'][0]['track_num']
         previous_episode_index = next(filter(lambda x: x[1]['title'] == db_podcast['episodes'][0]['title'], enumerate(podcast.feed.entries)), None)[0]
